@@ -1,0 +1,18 @@
+{
+  "name": "whisplink",
+  "version": "1.0.0",
+  "description": "A secure real-time messaging app",
+  "main": "functions/socket.js",
+  "scripts": {
+    "dev": "netlify dev"
+  },
+  "dependencies": {
+    "mongodb": "^4.17.0",
+    "bcrypt": "^5.1.1"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  },
+  "author": "mirmohmmadluqman",
+  "license": "MIT"
+}

@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WhispLink</title>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@700&display=swap" rel="stylesheet">
+  <script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+  <style>
+    :root {
+      --bg-light: #f9f9f9;
+      --text-light: #111;
+      --bg-dark: #121212;
+      --text-dark: #eee;
+      --primary-light: #003087;
+      --primary-dark: #0040c1;
+      --today-border: #ff2d55;
+      --transition-duration: 0.4s;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    }
+
+    body {
+      background: var(--bg-light);
+      color: var(--text-light);
+      transition: background var(--transition-duration), color var(--transition-duration);
+    }
+
+    body.dark {
+      background: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    header {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 0.5rem 1rem;
+      background: transparent;
+    }
+
+    .login-screen {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background: var(--bg-light);
+    }
+
+    body.dark .login-screen {
+      background: var(--bg-dark);
+    }
+
+    .login-screen h2 {
+      font-family: 'Lora', serif;
+      font-weight: 700;
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+    }
+
+    .login-screen p {
+      font-size: 1rem;
+      margin-bottom: 20px;
+      opacity: 0.9;
+    }
+
+    .login-screen input {
+      width: 280px;
+      padding: 0.4rem 0.6rem;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+      transition: border-color 0.3s ease;
+    }
+
+    body.dark .login-screen input {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-dark);
+      border-color: rgba(255, 255, 255, 255, 0.2);
+    }
+
+    .login-screen input:focus {
+      outline: none;
+      border-color: var(--primary-light);
+    }
+
+    body.dark .login-screen input:focus {
+      border-color: var(--primary-dark);
+    }
+
+    button {
+      background: var(--primary-light);
+      border: none;
+      color: white;
+      padding: 0.3rem 0.8rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      box-shadow: 0 3px 8px rgba(0, 48, 135, 0.3);
+      transition: background-color 0.3s ease, transform 0.15s ease;
+    }
+
+    button:hover {
+      background: #0040c1;
+      transform: scale(1.05);
+    }
+
+    button:active {
+      transform: scale(0.95);
+    }
+
+    body.dark button {
+      background: var(--primary-dark);
+      box-shadow: 0 3px 8px rgba(0, 64, 193, 0.6);
+    }
+
+    body.dark button:hover {
+      background: #0052f0;
+    }
+
+    .app {
+      display: flex;
+      height: calc(100vh - 48px);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 280px;
+      background: var(--bg-light);
+      padding: 20px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transform: translateX(-100%);
+      transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+      position: fixed;
+      height: 100%;
+      z-index: 100;
+      overflow-y: auto;
+    }
+
+    .sidebar.open {
+      transform: translateX(0);
+    }
+
+    body.dark .sidebar {
+      background: var(--bg-dark);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+    }
+
+    .sidebar input, .sidebar button {
+      width: 100%;
+      padding: 0.4rem 0.6rem;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    .sidebar input {
+      border: 1px solid #ccc;
+      transition: border-color 0.3s ease;
+    }
+
+    .sidebar input:focus {
+      outline: none;
+      border-color: var(--primary-light);
+    }
+
+    body.dark .sidebar input {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-dark);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    body.dark .sidebar input:focus {
+      border-color: var(--primary-dark);
+    }
+
+    .chat-history {
+      margin-top: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .chat-history-item {
+      padding: 6px 8px;
+      border-radius: 10px;
+      background: rgba(0, 122, 255, 0.1);
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+      font-size: 0.9rem;
+      user-select: none;
+    }
+
+    body.dark .chat-history-item {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-dark);
+    }
+
+    .chat-history-item:hover {
+      background: var(--primary-light);
+      color: white;
+    }
+
+    body.dark .chat-history-item:hover {
+      background: var(--primary-dark);
+    }
+
+    .chat-history-item.active {
+      border: 2px solid var(--today-border);
+    }
+
+    .chat-history-item.pinned {
+      background: rgba(0, 122, 255, 0.2);
+      font-weight: 500;
+    }
+
+    body.dark .chat-history-item.pinned {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .chat-section {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg-light);
+    }
+
+    body.dark .chat-section {
+      background: var(--bg-dark);
+    }
+
+    .chat-header {
+      padding: 15px;
+      background: transparent;
+      font-family: 'Lora', serif;
+      font-weight: 700;
+      font-size: 1.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-status {
+      padding: 5px 15px;
+      font-size: 0.9rem;
+      opacity: 0.8;
+    }
+
+    .typing-indicator {
+      font-style: italic;
+      padding: 5px 15px;
+      font-size: 0.9rem;
+      color: #888;
+    }
+
+    body.dark .typing-indicator {
+      color: #aaa;
+    }
+
+    .chat-box {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      aria-live: "polite";
+    }
+
+    .message {
+      max-width: 70%;
+      padding: 10px 15px;
+      border-radius: 15px;
+      background: rgba(0, 122, 255, 0.1);
+      box-shadow: 0 3px 8px rgba(0, 48, 135, 0.3);
+      position: relative;
+      transition: background-color 0.3s ease;
+    }
+
+    .message.sent {
+      align-self: flex-end;
+      border-bottom-right-radius: 5px;
+    }
+
+    .message.received {
+      align-self: flex-start;
+      border-bottom-left-radius: 5px;
+    }
+
+    body.dark .message {
+      background: rgba(255, 255, 255, 0.05);
+      box-shadow: 0 3px 8px rgba(0, 64, 193, 0.6);
+    }
+
+    .message:hover {
+      background: var(--primary-light);
+      color: white;
+    }
+
+    body.dark .message:hover {
+      background: var(--primary-dark);
+    }
+
+    .message img {
+      max-width: 200px;
+      border-radius: 10px;
+      margin-top: 5px;
+    }
+
+    .message .timestamp {
+      font-size: 0.9rem;
+      color: #666;
+      text-align: right;
+      margin-top: 5px;
+    }
+
+    body.dark .message .timestamp {
+      color: #aaa;
+    }
+
+    .message .read-receipt {
+      font-size: 0.8rem;
+      color: var(--primary-light);
+      margin-top: 2px;
+    }
+
+    body.dark .message .read-receipt {
+      color: var(--primary-dark);
+    }
+
+    .message .reactions {
+      font-size: 0.8rem;
+      margin-top: 5px;
+    }
+
+    .message-actions {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      display: none;
+      gap: 5px;
+    }
+
+    .message:hover .message-actions {
+      display: flex;
+    }
+
+    .message-actions button {
+      padding: 5px;
+      font-size: 0.8rem;
+      border-radius: 50%;
+    }
+
+    .chat-input {
+      display: flex;
+      padding: 15px;
+      background: var(--bg-light);
+      border-top: 1px solid #ccc;
+      gap: 10px;
+    }
+
+    body.dark .chat-input {
+      background: var(--bg-dark);
+      border-top: 1px solid #444;
+    }
+
+    .chat-input input {
+      flex: 1;
+      padding: 0.4rem 0.6rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 1rem;
+      transition: border-color 0.3s ease;
+    }
+
+    .chat-input input:focus {
+      outline: none;
+      border-color: var(--primary-light);
+    }
+
+    body.dark .chat-input input {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-dark);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    body.dark .chat-input input:focus {
+      border-color: var(--primary-dark);
+    }
+
+    .emoji-modal {
+      position: absolute;
+      bottom: 60px;
+      right: 20px;
+      background: var(--bg-light);
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+      display: none;
+      z-index: 1000;
+    }
+
+    body.dark .emoji-modal {
+      background: var(--bg-dark);
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+    }
+
+    .emoji-modal span {
+      font-size: 1.2rem;
+      margin: 5px;
+      cursor: pointer;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.4);
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: var(--bg-light);
+      padding: 20px;
+      border-radius: 16px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+      transform: scale(0.7) rotateX(30deg);
+      opacity: 0;
+      transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1), opacity 0.4s ease;
+    }
+
+    .modal-content.open {
+      transform: scale(1) rotateX(0deg);
+      opacity: 1;
+    }
+
+    body.dark .modal-content {
+      background: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    .modal-content h3 {
+      font-family: 'Lora', serif;
+      font-weight: 700;
+      font-size: 1.8rem;
+      margin-bottom: 15px;
+      color: var(--primary-light);
+    }
+
+    body.dark .modal-content h3 {
+      color: var(--primary-dark);
+    }
+
+    .modal-content p, .modal-content li {
+      margin-bottom: 10px;
+      line-height: 1.5;
+      font-size: 1rem;
+    }
+
+    .modal-content input {
+      width: 100%;
+      padding: 0.4rem 0.6rem;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+    }
+
+    body.dark .modal-content input {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-dark);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .modal-content button {
+      margin-right: 10px;
+    }
+
+    .modal-content a {
+      color: var(--primary-light);
+      text-decoration: none;
+    }
+
+    body.dark .modal-content a {
+      color: var(--primary-dark);
+    }
+
+    .sidebar-toggle {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      padding: 0;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 5px rgba(0, 48, 135, 0.3);
+    }
+
+    body.dark .sidebar-toggle {
+      box-shadow: 0 2px 5px rgba(0, 64, 193, 0.6);
+    }
+
+    .contact-modal .social-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .contact-modal .social-buttons button {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 1rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+
+    .contact-modal .social-buttons button:hover {
+      transform: scale(1.2) rotate(360deg);
+      background: #0052f0;
+      box-shadow: 0 0 10px rgba(0, 82, 240, 0.5);
+    }
+
+    body.dark .contact-modal .social-buttons button:hover {
+      box-shadow: 0 0 10px rgba(0, 82, 240, 0.7);
+    }
+
+    .group-modal textarea {
+      width: 100%;
+      padding: 0.4rem 0.6rem;
+      margin: 8px 0;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 1rem;
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    body.dark .group-modal textarea {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-dark);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+  </style>
+</head>
+<body class="light">
+  <header>
+    <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Sidebar">☰</button>
+  </header>
+  <div class="login-screen" id="loginScreen">
+    <h2>WhispLink</h2>
+    <p>Welcome to your secure messaging app!</p>
+    <input type="text" id="handle" placeholder="Handle (e.g., @user)" aria-label="Username" />
+    <input type="password" id="password" placeholder="Password" aria-label="Password" />
+    <button id="loginButton" aria-label="Login or Sign Up">Login / Sign Up <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg></button>
+    <p id="loginStatus" style="display: none; font-size: 0.9rem; color: #888;">Processing...</p>
+  </div>
+
+  <div class="app" id="app" style="display: none;">
+    <div class="sidebar" id="sidebar">
+      <input type="text" id="searchUser" placeholder="Search handle or group" aria-label="Search user or group by handle" />
+      <input type="text" id="messageSearch" placeholder="Search messages..." aria-label="Search messages in chat" />
+      <button id="searchButton" aria-label="Search user or group">Search <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg></button>
+      <button id="groupButton" aria-label="Create Group Chat">Create Group <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></button>
+      <button id="profileButton" aria-label="Profile Settings">Profile <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+      <button id="statusButton" aria-label="Toggle Online Status">Go Offline <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8Zm0-12a4 4 0 1 0 4 4 4 4 0 0 0-4-4Z"/></svg></button>
+      <button id="guideButton" aria-label="User Guide">User Guide <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v.01M12 12v.01M12 8v.01"/></svg></button>
+      <button id="contactButton" aria-label="Contact Us">Contact Us <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></button>
+      <button id="clearChatButton" aria-label="Clear Chat">Clear Chat <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M5 6v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6M10 11v6M14 11v6"/></svg></button>
+      <button id="exportButton" aria-label="Export Backup">Export Backup <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg></button>
+      <input type="file" id="importFile" accept=".json" style="display: none;" aria-hidden="true" />
+      <button id="importButton" aria-label="Import Backup">Import Backup <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg></button>
+      <button id="logoutButton" aria-label="Logout">Logout <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg></button>
+      <button id="themeButton" aria-label="Toggle Theme">Toggle Theme 🌙</button>
+      <div class="chat-history" id="chatHistory" role="listbox" aria-label="Chat History"></div>
+    </div>
+    <div class="chat-section">
+      <div class="chat-header" id="chatHeader" aria-live="polite"></div>
+      <div class="chat-status" id="chatStatus" aria-live="polite"></div>
+      <div class="typing-indicator" id="typingIndicator" style="display: none;"></div>
+      <div class="chat-box" id="chatBox" role="log" aria-label="Chat messages"></div>
+      <div class="chat-input">
+        <input type="text" id="messageInput" placeholder="Type a message..." aria-label="Type a message" />
+        <input type="file" id="fileInput" accept="image/*" style="display: none;" aria-hidden="true" />
+        <button id="fileButton" aria-label="Attach file">📎</button>
+        <button id="emojiButton" aria-label="Open emoji picker">😊</button>
+        <button id="sendButton" aria-label="Send message">Send <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12l20-10-10 20-2-8-8-2z"/></svg></button>
+      </div>
+      <div class="emoji-modal" id="emojiModal">
+        <span>😊</span><span>👍</span><span>😍</span><span>🚀</span><span>❤️</span><span>😂</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="errorModal" role="dialog" aria-labelledby="errorModalTitle">
+    <div class="modal-content" aria-labelledby="errorModalTitle">
+      <h3 id="errorModalTitle">Error</h3>
+      <p id="errorMessage"></p>
+      <button id="errorModalClose" aria-label="Close error modal">Close</button>
+    </div>
+  </div>
+
+  <div class="modal" id="guideModal" role="dialog" aria-labelledby="guideModalTitle">
+    <div class="modal-content" aria-labelledby="guideModalTitle">
+      <h3 id="guideModalTitle">User Guide</h3>
+      <ul>
+        <li><strong>Login/Sign Up:</strong> Enter a handle and password. New users are automatically registered.</li>
+        <li><strong>Search & Chat:</strong> Search for a handle or group, type messages, and press Enter or click Send.</li>
+        <li><strong>Group Chats:</strong> Create a group with up to 5 users via Create Group.</li>
+        <li><strong>Message Actions:</strong> Hover to edit, delete, forward, or add reactions (e.g., ❤️, 😂).</li>
+        <li><strong>File Sharing:</strong> Attach images using the 📎 button.</li>
+        <li><strong>Notifications:</strong> Enable browser notifications for new messages.</li>
+        <li><strong>Emoji Picker:</strong> Click 😊 to select emojis.</li>
+        <li><strong>Export/Import:</strong> Backup chats as JSON or import them.</li>
+        <li><strong>Theme:</strong> Toggle light/dark mode.</li>
+        <li><strong>Profile:</strong> Update handle/password in Profile Settings.</li>
+        <li><strong>Contact:</strong> Reach out via email/Twitter.</li>
+      </ul>
+      <button id="guideModalClose" aria-label="Close user guide">Close</button>
+    </div>
+  </div>
+
+  <div class="modal" id="confirmModal" role="dialog" aria-labelledby="confirmModalTitle">
+    <div class="modal-content" aria-labelledby="confirmModalTitle">
+      <h3 id="confirmModalTitle">Confirmation</h3>
+      <p id="confirmMessage"></p>
+      <button id="confirmModalYes" aria-label="Confirm action">Yes</button>
+      <button id="confirmModalNo" aria-label="Cancel action">No</button>
+    </div>
+  </div>
+
+  <div class="modal contact-modal" id="contactModal" role="dialog" aria-labelledby="contactModalTitle">
+    <div class="modal-content" aria-labelledby="contactModalTitle">
+      <h3 id="contactModalTitle">Contact Us</h3>
+      <p>Email: <a href="mailto:mirmohmmadluqman@gmail.com">mirmohmmadluqman@gmail.com</a></p>
+      <p>Twitter: <a href="https://twitter.com/mirmohmadluqman" target="_blank">@mirmohmadluqman</a></p>
+      <div class="social-buttons">
+        <button onclick="window.open('https://twitter.com/mirmohmadluqman', '_blank')" aria-label="Twitter"><span>🐦</span></button>
+        <button onclick="window.location.href='mailto:mirmohmmadluqman@gmail.com'" aria-label="Email"><span>✉️</span></button>
+      </div>
+      <button id="contactModalClose" aria-label="Close contact us">Close</button>
+    </div>
+  </div>
+
+  <div class="modal" id="profileModal" role="dialog" aria-labelledby="profileModalTitle">
+    <div class="modal-content" aria-labelledby="profileModalTitle">
+      <h3 id="profileModalTitle">Profile Settings</h3>
+      <label for="newHandle">New Handle</label>
+      <input type="text" id="newHandle" placeholder="New handle" aria-label="New username" />
+      <label for="newPassword">New Password</label>
+      <input type="password" id="newPassword" placeholder="New Password" aria-label="New password" />
+      <button id="saveProfileButton" aria-label="Save profile changes">Save</button>
+      <button id="profileModalClose" aria-label="Close profile settings">Close</button>
+    </div>
+  </div>
+
+  <div class="modal group-modal" id="groupModal" role="dialog" aria-labelledby="groupModalTitle">
+    <div class="modal-content" aria-labelledby="groupModalTitle">
+      <h3 id="groupModalTitle">Create Group Chat</h3>
+      <label for="groupName">Group Name</label>
+      <input type="text" id="groupName" placeholder="Group name" aria-label="Group name" />
+      <label for="groupMembers">Members (comma-separated handles)</label>
+      <textarea id="groupMembers" placeholder="e.g., @user1, @user2" aria-label="Group members"></textarea>
+      <button id="createGroupButton" aria-label="Create group">Create</button>
+      <button id="groupModalClose" aria-label="Close group creation">Close</button>
+    </div>
+  </div>
+
+  <div class="modal" id="forwardModal" role="dialog" aria-labelledby="forwardModalTitle">
+    <div class="modal-content" aria-labelledby="forwardModalTitle">
+      <h3 id="forwardModalTitle">Forward Message</h3>
+      <label for="forwardTo">Recipient or Group</label>
+      <input type="text" id="forwardTo" placeholder="Handle or group name" aria-label="Forward to" />
+      <button id="forwardMessageButton" aria-label="Forward message">Forward</button>
+      <button id="forwardModalClose" aria-label="Close forward modal">Close</button>
+    </div>
+  </div>
+
+  <audio id="notificationSound" src="https://www.soundjay.com/buttons/beep-01a.mp3"></audio>
+
+  <script>
+    // Show modal for errors
+    function showModal(modalId, message, callback) {
+      const modal = document.getElementById(modalId);
+      const content = modal.querySelector(".modal-content");
+      const messageElement = document.getElementById(modalId === "errorModal" ? "errorMessage" : "confirmMessage");
+      if (messageElement) messageElement.innerText = message;
+      modal.style.display = "flex";
+      content.classList.add("open");
+      if (modalId === "confirmModal") {
+        document.getElementById("confirmModalYes").onclick = () => {
+          callback();
+          modal.style.display = "none";
+          content.classList.remove("open");
+        };
+        document.getElementById("confirmModalNo").onclick = () => {
+          modal.style.display = "none";
+          content.classList.remove("open");
+        };
+      } else {
+        document.getElementById(modalId + "Close").onclick = () => {
+          modal.style.display = "none";
+          content.classList.remove("open");
+        };
+      }
+    }
+
+    // Fetch Ably key with error handling
+    fetch('/.netlify/functions/socket?getAblyKey=true', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (!data.ablyKey) {
+          throw new Error('Ably API key is missing in the response');
+        }
+        const ably = new Ably.Realtime({ key: data.ablyKey });
+        initializeApp(ably);
+      })
+      .catch(err => {
+        console.error('Failed to fetch Ably key:', err);
+        showModal('errorModal', 'Unable to initialize real-time messaging. Please check your configuration and try again.');
+      });
+
+    function initializeApp(ably) {
+      let currentUser = null;
+      let currentChat = null;
+      let messages = {};
+      let drafts = JSON.parse(localStorage.getItem("drafts")) || {};
+      let pinnedChats = JSON.parse(localStorage.getItem("pinnedChats")) || [];
+      let groups = {};
+
+      function saveDrafts() {
+        localStorage.setItem("drafts", JSON.stringify(drafts));
+      }
+
+      function savePinnedChats() {
+        localStorage.setItem("pinnedChats", JSON.stringify(pinnedChats));
+      }
+
+      async function loginUser() {
+        const handleInput = document.getElementById("handle").value.trim();
+        const password = document.getElementById("password").value.trim();
+        const loginStatus = document.getElementById("loginStatus");
+        const loginButton = document.getElementById("loginButton");
+
+        if (!handleInput || !password) {
+          showModal("errorModal", "Please fill all fields.");
+          return;
+        }
+
+        const handle = handleInput.startsWith("@") ? handleInput : `@${handleInput}`;
+        loginStatus.style.display = "block";
+        loginButton.disabled = true;
+
+        try {
+          const response = await fetch('/.netlify/functions/socket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'login', handle, password })
+          });
+          const result = await response.json();
+
+          if (result.success) {
+            currentUser = handle;
+            localStorage.setItem("currentUser", currentUser);
+            document.getElementById("loginScreen").style.display = "none";
+            document.getElementById("app").style.display = "flex";
+            subscribeToChannels();
+            loadChatHistory();
+            requestNotificationPermission();
+            if (result.created) {
+              showModal("errorModal", "Account created successfully! You are now logged in.");
+            }
+          } else {
+            showModal("errorModal", result.message || "Login failed.");
+          }
+        } catch (err) {
+          showModal("errorModal", "Network error. Please try again.");
+        } finally {
+          loginStatus.style.display = "none";
+          loginButton.disabled = false;
+        }
+      }
+
+      async function searchUserOrGroup() {
+        const searchInput = document.getElementById("searchUser").value.trim();
+        const searchHandle = searchInput.startsWith("@") ? searchInput : `@${searchInput}`;
+        if (searchHandle === currentUser) {
+          showModal("errorModal", "You cannot chat with yourself!");
+          return;
+        }
+
+        try {
+          const response = await fetch('/.netlify/functions/socket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'search', query: searchHandle })
+          });
+          const result = await response.json();
+
+          if (result.success) {
+            currentChat = result.isGroup ? searchInput : searchHandle;
+            document.getElementById("chatHeader").innerText = currentChat;
+            document.getElementById("chatStatus").innerText = result.isGroup ? `Group with ${result.members.length} members` : result.lastSeen;
+            document.getElementById("messageInput").value = drafts[currentChat] || "";
+            loadMessages(getChatId(currentUser, currentChat));
+            loadChatHistory();
+          } else {
+            showModal("errorModal", "User or group not found!");
+          }
+        } catch (err) {
+          showModal("errorModal", "Network error. Please try again.");
+        }
+      }
+
+      function searchMessages() {
+        const query = document.getElementById("messageSearch").value.trim().toLowerCase();
+        const chatBox = document.getElementById("chatBox");
+        chatBox.innerHTML = "";
+        if (!currentChat) return;
+
+        const chatId = getChatId(currentUser, currentChat);
+        const chatMessages = messages[chatId] || [];
+        const filteredMessages = query ? chatMessages.filter(msg => msg.content.toLowerCase().includes(query)) : chatMessages;
+
+        filteredMessages.forEach((msg, index) => {
+          const messageDiv = document.createElement("div");
+          messageDiv.className = `message ${msg.sender === currentUser ? "sent" : "received"}`;
+          const highlightedContent = query ? msg.content.replace(new RegExp(`(${query})`, "gi"), '<mark style="background: rgba(0, 48, 135, 0.3); padding: 0 2px; border-radius: 2px;">$1</mark>') : msg.content;
+          const contentHtml = msg.type === "image" ? `<img src="${msg.content}" alt="Shared image" />` : highlightedContent;
+          messageDiv.innerHTML = `
+            ${msg.isGroup ? `<strong>${msg.sender}</strong>: ` : ""}${contentHtml}
+            <div class="timestamp">${formatTimestamp(msg.timestamp)}</div>
+            ${msg.sender === currentUser ? `<div class="read-receipt">${msg.read ? "✓✓" : "✓"}</div>` : ""}
+            <div class="reactions">${msg.reactions ? msg.reactions.join(" ") : ""}</div>
+            <div class="message-actions">
+              <button class="edit-message" data-index="${index}" aria-label="Edit message">✏️</button>
+              <button class="delete-message" data-index="${index}" aria-label="Delete message">🗑️</button>
+              <button class="react-message" data-index="${index}" aria-label="Add reaction">😀</button>
+              <button class="forward-message" data-index="${index}" aria-label="Forward message">➡️</button>
+            </div>
+          `;
+          chatBox.appendChild(messageDiv);
+        });
+
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }
+
+      async function sendMessage() {
+        const messageInput = document.getElementById("messageInput");
+        const content = messageInput.value.trim();
+        if (!content || !currentChat) return;
+
+        const chatId = getChatId(currentUser, currentChat);
+        const message = {
+          sender: currentUser,
+          content,
+          type: "text",
+          timestamp: new Date().toISOString(),
+          read: false,
+          reactions: [],
+          isGroup: !!groups[currentChat]
+        };
+
+        try {
+          const response = await fetch('/.netlify/functions/socket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'sendMessage', chatId, message })
+          });
+          if (!response.ok) throw new Error('Failed to send message');
+          const channel = ably.channels.get(`chat:${chatId}`);
+          channel.publish('message', { chatId, message });
+          messageInput.value = "";
+          delete drafts[currentChat];
+          saveDrafts();
+          playNotificationSound();
+        } catch (err) {
+          showModal("errorModal", "Failed to send message: " + err.message);
+        }
+      }
+
+      async function sendFile() {
+        const fileInput = document.getElementById("fileInput");
+        const file = fileInput.files[0];
+        if (!file || !currentChat) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const chatId = getChatId(currentUser, currentChat);
+          const message = {
+            sender: currentUser,
+            content: e.target.result,
+            type: "image",
+            timestamp: new Date().toISOString(),
+            read: false,
+            reactions: [],
+            isGroup: !!groups[currentChat]
+          };
+          try {
+            const response = await fetch('/.netlify/functions/socket', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'sendMessage', chatId, message })
+            });
+            if (!response.ok) throw new Error('Failed to send file');
+            const channel = ably.channels.get(`chat:${chatId}`);
+            channel.publish('message', { chatId, message });
+            fileInput.value = "";
+            playNotificationSound();
+          } catch (err) {
+            showModal("errorModal", "Failed to send file: " + err.message);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function subscribeToChannels() {
+        const userChannel = ably.channels.get(`user:${currentUser}`);
+        userChannel.subscribe('message', (msg) => {
+          const { chatId, message } = msg.data;
+          if (!messages[chatId]) messages[chatId] = [];
+          messages[chatId].push(message);
+          if (currentChat && chatId === getChatId(currentUser, currentChat)) {
+            loadMessages(chatId);
+            if (message.sender !== currentUser) {
+              markAsRead(chatId, message);
+              showNotification(`${message.sender} sent a ${message.type === "image" ? "image" : "message"}`);
+            }
+          }
+          loadChatHistory();
+        });
+
+        userChannel.subscribe('typing', (msg) => {
+          const { chatId, user } = msg.data;
+          if (chatId === getChatId(currentUser, currentChat) && user !== currentUser) {
+            const typingIndicator = document.getElementById("typingIndicator");
+            typingIndicator.innerText = `${user} is typing...`;
+            typingIndicator.style.display = "block";
+            setTimeout(() => {
+              typingIndicator.style.display = "none";
+            }, 3000);
+          }
+        });
+
+        userChannel.subscribe('statusUpdate', (msg) => {
+          const { handle, lastSeen } = msg.data;
+          if (currentChat === handle) {
+            document.getElementById("chatStatus").innerText = lastSeen;
+          }
+          loadChatHistory();
+        });
+
+        userChannel.subscribe('groupCreated', (msg) => {
+          const { groupName, members } = msg.data;
+          groups[groupName] = { members };
+          loadChatHistory();
+        });
+      }
+
+      async function markAsRead(chatId, message) {
+        try {
+          const response = await fetch('/.netlify/functions/socket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'markAsRead', chatId, message })
+          });
+          if (!response.ok) throw new Error('Failed to mark as read');
+          const channel = ably.channels.get(`chat:${chatId}`);
+          channel.publish('read', { chatId, message });
+        } catch (err) {
+          console.error('Failed to mark as read:', err);
+        }
+      }
+
+      async function editMessage(index) {
+        const chatId = getChatId(currentUser, currentChat);
+        const message = messages[chatId][index];
+        if (!message || message.sender !== currentUser) return;
+        const timeDiff = (new Date() - new Date(message.timestamp)) / 1000 / 60;
+        if (timeDiff > 5) {
+          showModal("errorModal", "Messages can only be edited within 5 minutes.");
+          return;
+        }
+        const newContent = prompt("Edit message:", message.content);
+        if (newContent && newContent.trim()) {
+          try {
+            const response = await fetch('/.netlify/functions/socket', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'editMessage', chatId, index, content: newContent.trim() })
+            });
+            if (!response.ok) throw new Error('Failed to edit message');
+            messages[chatId][index].content = newContent.trim();
+            const channel = ably.channels.get(`chat:${chatId}`);
+            channel.publish('edit', { chatId, index, content: newContent.trim() });
+            loadMessages(chatId);
+          } catch (err) {
+            showModal("errorModal", "Failed to edit message: " + err.message);
+          }
+        }
+      }
+
+      async function deleteMessage(index) {
+        showModal("confirmModal", "Delete this message?", async () => {
+          const chatId = getChatId(currentUser, currentChat);
+          try {
+            const response = await fetch('/.netlify/functions/socket', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'deleteMessage', chatId, index })
+            });
+            if (!response.ok) throw new Error('Failed to delete message');
+            messages[chatId].splice(index, 1);
+            const channel = ably.channels.get(`chat:${chatId}`);
+            channel.publish('delete', { chatId, index });
+            loadMessages(chatId);
+            loadChatHistory();
+          } catch (err) {
+            showModal("errorModal", "Failed to delete message: " + err.message);
+          }
+        });
+      }
+
+      async function forwardMessage(index) {
+        const chatId = getChatId(currentUser, currentChat);
+        const message = messages[chatId][index];
+        if (!message) return;
+        showModal("forwardModal", "", async () => {
+          const forwardTo = document.getElementById("forwardTo").value.trim();
+          const target = forwardTo.startsWith("@") ? forwardTo : `@${forwardTo}`;
+          try {
+            const response = await fetch('/.netlify/functions/socket', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'search', query: target })
+            });
+            const result = await response.json();
+            if (result.success) {
+              const newChatId = getChatId(currentUser, result.isGroup ? forwardTo : target);
+              const forwardedMessage = { ...message, sender: currentUser, timestamp: new Date().toISOString(), read: false };
+              const sendResponse = await fetch('/.netlify/functions/socket', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'sendMessage', chatId: newChatId, message: forwardedMessage })
+              });
+              if (!sendResponse.ok) throw new Error('Failed to forward message');
+              const channel = ably.channels.get(`chat:${newChatId}`);
+              channel.publish('message', { chatId: newChatId, message: forwardedMessage });
+              document.getElementById("forwardModal").style.display = "none";
+              document.querySelector("#forwardModal .modal-content").classList.remove("open");
+              showModal("errorModal", "Message forwarded successfully!");
+            } else {
+              showModal("errorModal", "Recipient or group not found!");
+            }
+          } catch (err) {
+            showModal("errorModal", "Failed to forward message: " + err.message);
+          }
+        });
+      }
+
+      async function addReaction(index) {
+        const reaction = prompt("Enter an emoji to react (e.g., ❤️, 😂):");
+        if (reaction && reaction.trim()) {
+          const chatId = getChatId(currentUser, currentChat);
+          try {
+            const response = await fetch('/.netlify/functions/socket', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'addReaction', chatId, index, reaction: reaction.trim() })
+            });
+            if (!response.ok) throw new Error('Failed to add reaction');
+            messages[chatId][index].reactions.push(reaction.trim());
+            const channel = ably.channels.get(`chat:${chatId}`);
+            channel.publish('reaction', { chatId, index, reaction: reaction.trim() });
+            loadMessages(chatId);
+          } catch (err) {
+            showModal("errorModal", "Failed to add reaction: " + err.message);
+          }
+        }
+      }
+
+      function loadMessages(chatId) {
+        searchMessages();
+      }
+
+      async function loadChatHistory() {
+        try {
+          const response = await fetch('/.netlify/functions/socket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'getChats', user: currentUser })
+          });
+          if (!response.ok) throw new Error('Failed to load chat history');
+          const result = await response.json();
+          if (result.success) {
+            const chatHistory = document.getElementById("chatHistory");
+            chatHistory.innerHTML = "";
+            const chats = result.chats;
+            const pinned = chats.filter(chat => pinnedChats.includes(chat.chatId));
+            const unpinned = chats.filter(chat => !pinnedChats.includes(chat.chatId));
+
+            [...pinned, ...unpinned].forEach(chat => {
+              const item = document.createElement("div");
+              item.className = `chat-history-item ${chat.chatId === getChatId(currentUser, currentChat) ? "active" : ""} ${pinnedChats.includes(chat.chatId) ? "pinned" : ""}`;
+              item.setAttribute("role", "button");
+              item.setAttribute("aria-label", `Chat with ${chat.name}`);
+              item.innerHTML = `
+                ${chat.name} (${chat.isGroup ? `Group, ${chat.members.length} members` : chat.lastSeen})
+                <button class="pin-chat" data-id="${chat.chatId}" aria-label="${pinnedChats.includes(chat.chatId) ? "Unpin chat" : "Pin chat"}">${pinnedChats.includes(chat.chatId) ? "📌" : "📍"}</button>
+              `;
+              item.onclick = () => {
+                currentChat = chat.name;
+                document.getElementById("chatHeader").innerText = currentChat;
+                document.getElementById("chatStatus").innerText = chat.isGroup ? `Group with ${chat.members.length} members` : chat.lastSeen;
+                document.getElementById("messageInput").value = drafts[currentChat] || "";
+                loadMessages(chat.chatId);
+                loadChatHistory();
+              };
+              item.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') item.click(); };
+              chatHistory.appendChild(item);
+            });
+          }
+        } catch (err) {
+          showModal("errorModal", "Failed to load chat history: " + err.message);
+        }
+      }
+
+      function getChatId(user, chat) {
+        if (groups[chat]) {
+          return `${user}-${chat}`;
+        }
+        return [user, chat].sort().join("-");
+      }
+
+      function formatTimestamp(isoString) {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+
+      function getLastSeen() {
+        return Math.random() > 0.5 ? "Online" : `Last seen ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+      }
+
+      function toggleTheme() {
+        document.body.classList.toggle("dark");
+        localStorage.setItem("theme", document.body.classList.contains("dark") ? "dark" : "light");
+        document.getElementById("themeButton").innerText = document.body.classList.contains("dark") ? "Toggle Theme ☀️" : "Toggle Theme 🌙";
+      }
+
+      function addEmoji(emoji) {
+        const messageInput = document.getElementById("messageInput");
+        messageInput.value += emoji;
+        messageInput.focus();
+        document.getElementById("emojiModal").style.display = "none";
+      }
+
+      function toggleEmojiPicker() {
+        const emojiModal = document.getElementById("emojiModal");
+        emojiModal.style.display = emojiModal.style.display === "block" ? "none" : "block";
+      }
+
+      async function createGroup() {
+        const groupName = document.getElementById("groupName").value.trim();
+        const membersInput = document.getElementById("groupMembers").value.trim();
+        const members = membersInput.split(",").map(m => m.trim()).map(m => m.startsWith("@") ? m : `@${m}`);
+
+        if (!groupName || members.length < 2 || members.length > 5) {
+          showModal("errorModal", "Group name is required, and 2-5 members are allowed.");
+          return;
+        }
+
+        try {
+          const response = await fetch('/.netlify/functions/socket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'createGroup', groupName, members: [currentUser, ...members.filter(m => m !== currentUser)] })
+          });
+          const result = await response.json();
+          if (result.success) {
+            groups[groupName] = { members: result.members };
+            const channel = ably.channels.get(`user:${currentUser}`);
+            channel.publish('groupCreated', { groupName, members: result.members });
+            document.getElementById("groupModal").style.display = "none";
+            document.querySelector("#groupModal .modal-content").classList.remove("open");
+            showModal("errorModal", `Group ${groupName} created successfully!`);
+          } else {
+            showModal("errorModal", result.message || "Failed to create group.");
+          }
+        } catch (err) {
+          showModal("errorModal", "Failed to create group: " + err.message);
+        }
+      }
+
+      async function exportBackup() {
+        showModal("confirmModal", "Export all chat data as JSON?", async () => {
+          try {
+            const response = await fetch('/.netlify/functions/socket', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'exportData', user: currentUser })
+            });
+            if (!response.ok) throw new Error('Failed to export data');
+            const result = await response.json();
+            if (result.success) {
+              const data = JSON.stringify(result.data);
+              const blob = new Blob([data], { type: "application/json" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = "whisplink_backup.json";
+              a.click();
+              URL.revokeObjectURL(url);
+            } else {
+              showModal("errorModal", "Failed to export data.");
+            }
+          } catch (err) {
+            showModal("errorModal", "Failed to export data: " + err.message);
+          }
+        });
+      }
+
+      async function importBackup(event) {
+        showModal("confirmModal", "Import chat data? This will overwrite existing chats.", async () => {
+          const file = event.target.files[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              const data = JSON.parse(e.target.result);
+              const response = await fetch('/.netlify/functions/socket', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'importData', user: currentUser, data })
+              });
+              if (!response.ok) throw new Error('Failed to import data');
+              const result = await response.json();
+              if (result.success) {
+                messages = result.messages;
+                groups = result.groups;
+                loadChatHistory();
+                loadMessages(getChatId(currentUser, currentChat));
+                showModal("errorModal", "Backup imported successfully!");
+              } else {
+                showModal("errorModal", "Failed to import data.");
+              }
+            } catch (err) {
+              showModal("errorModal", "Invalid file format or network error: " + err.message);
+            }
+          };
+          reader.readAsText(file);
+        });
+      }
+
+      async function clearChat() {
+        if (!currentChat) return;
+        showModal("confirmModal", `Clear chat with ${currentChat}?`, async () => {
+          const chatId = getChatId(currentUser, currentChat);
+          try {
+            const response = await fetch('/.netlify/functions/socket', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'clearChat', chatId })
+            });
+            if (!response.ok) throw new Error('Failed to clear chat');
+            messages[chatId] = [];
+            const channel = ably.channels.get(`chat:${chatId}`);
+            channel.publish('clear', { chatId });
+            loadMessages(chatId);
+            loadChatHistory();
+          } catch (err) {
+            showModal("errorModal", "Failed to clear chat: " + err.message);
+          }
+        });
+      }
+
+      function toggleSidebar() {
+        const sidebar = document.getElementById("sidebar");
+        sidebar.classList.toggle("open");
+      }
+
+      async function toggleOnlineStatus() {
+        if (!currentUser) return;
+        const online = document.getElementById("statusButton").innerText === "Go Offline";
+        const lastSeen = online ? getLastSeen() : "Online";
+        try {
+          const response = await fetch('/.netlify/functions/socket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'updateStatus', handle: currentUser, online: !online, lastSeen })
+          });
+          if (!response.ok) throw new Error('Failed to update status');
+          document.getElementById("statusButton").innerText = online ? "Go Online" : "Go Offline";
+          const channel = ably.channels.get(`user:${currentUser}`);
+          channel.publish('statusUpdate', { handle: currentUser, online: !online, lastSeen });
+          loadChatHistory();
+        } catch (err) {
+          showModal("errorModal", "Failed to update status: " + err.message);
+        }
+      }
+
+      async function saveProfile() {
+        const newHandleInput = document.getElementById("newHandle").value.trim();
+        const newPassword = document.getElementById("newPassword").value.trim();
+        if (!newHandleInput && !newPassword) {
+          showModal("errorModal", "Please enter a new handle or password.");
+          return;
+        }
+        const newHandle = newHandleInput.startsWith("@") ? newHandleInput : `@${newHandleInput}`;
+        showModal("confirmModal", "Save profile changes?", async () => {
+          try {
+            const response = await fetch('/.netlify/functions/socket', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'updateProfile', oldHandle: currentUser, newHandle, newPassword })
+            });
+            if (!response.ok) throw new Error('Failed to update profile');
+            const result = await response.json();
+            if (result.success) {
+              if (newHandle !== currentUser) {
+                currentUser = newHandle;
+                localStorage.setItem("currentUser", currentUser);
+                const channel = ably.channels.get(`user:${currentUser}`);
+                channel.publish('updateHandle', { oldHandle: currentUser, newHandle });
+              }
+              loadChatHistory();
+              loadMessages(getChatId(currentUser, currentChat));
+              showModal("errorModal", "Profile updated successfully!");
+              document.getElementById("newHandle").value = "";
+              document.getElementById("newPassword").value = "";
+              document.getElementById("profileModal").style.display = "none";
+              document.querySelector("#profileModal .modal-content").classList.remove("open");
+            } else {
+              showModal("errorModal", result.message || "Failed to update profile.");
+            }
+          } catch (err) {
+            showModal("errorModal", "Failed to update profile: " + err.message);
+          }
+        });
+      }
+
+      function playNotificationSound() {
+        const sound = document.getElementById("notificationSound");
+        sound.play().catch(() => {});
+      }
+
+      function requestNotificationPermission() {
+        if (Notification.permission !== "granted") {
+          Notification.requestPermission();
+        }
+      }
+
+      function showNotification(message) {
+        if (Notification.permission === "granted") {
+          new Notification("WhispLink", { body: message });
+        }
+      }
+
+      function saveDraft() {
+        const messageInput = document.getElementById("messageInput");
+        if (currentChat && messageInput.value.trim()) {
+          drafts[currentChat] = messageInput.value.trim();
+          saveDrafts();
+        } else if (currentChat && !messageInput.value.trim()) {
+          delete drafts[currentChat];
+          saveDrafts();
+        }
+      }
+
+      function pinChat(chatId) {
+        if (pinnedChats.includes(chatId)) {
+          pinnedChats = pinnedChats.filter(id => id !== chatId);
+        } else {
+          pinnedChats.push(chatId);
+        }
+        savePinnedChats();
+        loadChatHistory();
+      }
+
+      function sendTypingIndicator() {
+        if (currentChat) {
+          const channel = ably.channels.get(`chat:${getChatId(currentUser, currentChat)}`);
+          channel.publish('typing', { chatId: getChatId(currentUser, currentChat), user: currentUser });
+        }
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const theme = localStorage.getItem("theme") || "light";
+        if (theme === "dark") document.body.classList.add("dark");
+        document.getElementById("themeButton").innerText = theme === "dark" ? "Toggle Theme ☀️" : "Toggle Theme 🌙";
+
+        const savedUser = localStorage.getItem("currentUser");
+        if (savedUser) {
+          currentUser = savedUser;
+          document.getElementById("loginScreen").style.display = "none";
+          document.getElementById("app").style.display = "flex";
+          subscribeToChannels();
+          loadChatHistory();
+          requestNotificationPermission();
+        }
+
+        document.getElementById("loginButton").addEventListener("click", loginUser);
+        document.getElementById("searchButton").addEventListener("click", searchUserOrGroup);
+        document.getElementById("logoutButton").addEventListener("click", async () => {
+          try {
+            const response = await fetch('/.netlify/functions/socket', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'updateStatus', handle: currentUser, online: false, lastSeen: getLastSeen() })
+            });
+            if (!response.ok) throw new Error('Failed to logout');
+            currentUser = null;
+            currentChat = null;
+            localStorage.removeItem("currentUser");
+            document.getElementById("app").style.display = "none";
+            document.getElementById("loginScreen").style.display = "flex";
+            document.getElementById("chatBox").innerHTML = "";
+            document.getElementById("chatHeader").innerText = "";
+          } catch (err) {
+            showModal("errorModal", "Failed to logout: " + err.message);
+          }
+        });
+        document.getElementById("sendButton").addEventListener("click", sendMessage);
+        document.getElementById("themeButton").addEventListener("click", toggleTheme);
+        document.getElementById("exportButton").addEventListener("click", exportBackup);
+        document.getElementById("importButton").addEventListener("click", () => document.getElementById("importFile").click());
+        document.getElementById("importFile").addEventListener("change", importBackup);
+        document.getElementById("guideButton").addEventListener("click", () => showModal("guideModal", ""));
+        document.getElementById("contactButton").addEventListener("click", () => showModal("contactModal", ""));
+        document.getElementById("clearChatButton").addEventListener("click", clearChat);
+        document.getElementById("sidebarToggle").addEventListener("click", toggleSidebar);
+        document.getElementById("profileButton").addEventListener("click", () => showModal("profileModal", ""));
+        document.getElementById("saveProfileButton").addEventListener("click", saveProfile);
+        document.getElementById("statusButton").addEventListener("click", toggleOnlineStatus);
+        document.getElementById("emojiButton").addEventListener("click", toggleEmojiPicker);
+        document.getElementById("emojiModal").addEventListener("click", e => {
+          if (e.target.tagName === "SPAN") addEmoji(e.target.innerText);
+        });
+        document.getElementById("groupButton").addEventListener("click", () => showModal("groupModal", ""));
+        document.getElementById("createGroupButton").addEventListener("click", createGroup);
+        document.getElementById("fileButton").addEventListener("click", () => document.getElementById("fileInput").click());
+        document.getElementById("fileInput").addEventListener("change", sendFile);
+        document.getElementById("messageInput").addEventListener("focus", sendTypingIndicator);
+        document.getElementById("messageInput").addEventListener("input", () => {
+          saveDraft();
+          sendTypingIndicator();
+        });
+        document.getElementById("messageInput").addEventListener("keypress", e => {
+          if (e.key === "Enter") sendMessage();
+        });
+        document.getElementById("searchUser").addEventListener("keypress", e => {
+          if (e.key === "Enter") searchUserOrGroup();
+        });
+        document.getElementById("messageSearch").addEventListener("input", searchMessages);
+        document.getElementById("chatBox").addEventListener("click", e => {
+          if (e.target.classList.contains("edit-message")) editMessage(e.target.dataset.index);
+          if (e.target.classList.contains("delete-message")) deleteMessage(e.target.dataset.index);
+          if (e.target.classList.contains("react-message")) addReaction(e.target.dataset.index);
+          if (e.target.classList.contains("forward-message")) forwardMessage(e.target.dataset.index);
+        });
+        document.getElementById("chatHistory").addEventListener("click", e => {
+          if (e.target.classList.contains("pin-chat")) pinChat(e.target.dataset.id);
+        });
+        document.addEventListener("click", e => {
+          if (!e.target.closest("#emojiButton") && !e.target.closest("#emojiModal")) {
+            document.getElementById("emojiModal").style.display = "none";
+          }
+        });
+      });
+    }
+  </script>
+</body>
+</html>

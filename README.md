@@ -1,3 +1,7 @@
+# Currently Under Devlopment
+
+### Structure
+```
 WhispLink/
 ├── public/
 │   └── index.html    # From previous artifact
@@ -7,3 +11,4 @@ WhispLink/
 ├── package.json      # From Step 6
 ├── .gitignore        # Add .env here
 └── README.md         # Optional
+```
